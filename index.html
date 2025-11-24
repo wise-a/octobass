@@ -7,27 +7,56 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --bg-color: #f4f4f9;
+            --bg-color: #fdfbf7;
             --card-bg: #ffffff;
-            --text-color: #333;
-            --accent-color: #3b82f6;
-            --danger-color: #ef4444;
+            --text-color: #2d3748;
+            --accent-color: #4a5568;
+            --accent-hover: #2d3748;
+            --danger-color: #e53e3e;
+            --border-color: #e2e8f0;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a202c;
+            --card-bg: #2d3748;
+            --text-color: #f7fafc;
+            --accent-color: #cbd5e0;
+            --accent-hover: #e2e8f0;
+            --danger-color: #fc8181;
+            --border-color: #4a5568;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: Georgia, 'Times New Roman', Times, serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
         }
 
-        h1 { 
-            text-align: center; 
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
+        }
+
+        h1 {
             font-weight: 800;
             letter-spacing: -1px;
+            margin: 0;
+        }
+
+        .theme-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
         }
 
         /* Input Area */
@@ -37,13 +66,16 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             margin-bottom: 30px;
+            border: 1px solid var(--border-color);
         }
 
         textarea {
             width: 100%;
             height: 80px;
             padding: 10px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
             border-radius: 8px;
             resize: vertical;
             font-family: inherit;
@@ -52,7 +84,7 @@
 
         .btn-primary {
             background-color: var(--accent-color);
-            color: white;
+            color: var(--bg-color);
             border: none;
             padding: 10px 20px;
             border-radius: 6px;
@@ -62,8 +94,8 @@
             width: 100%;
         }
 
-        .btn-primary:hover { opacity: 0.9; }
-        .btn-primary:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* Feed Area */
         .feed { display: flex; flex-direction: column; gap: 15px; }
@@ -72,7 +104,7 @@
             background: var(--card-bg);
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-color);
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             position: relative; 
         }
@@ -104,7 +136,10 @@
 </head>
 <body>
 
-    <h1>Octobass</h1>
+    <div class="header-container">
+        <h1>Octobass</h1>
+        <button id="theme-toggle" class="theme-btn" onclick="toggleTheme()" aria-label="Toggle Dark Mode">🌙</button>
+    </div>
 
     <div class="post-box">
         <textarea id="postContent" placeholder="Write something on Octobass..." maxlength="280"></textarea>
@@ -116,17 +151,59 @@
     </div>
 
     <script>
+        /**
+         * Toggles the application's visual theme between light and dark modes.
+         *
+         * It checks the current 'data-theme' attribute on the document body.
+         * If the current theme is 'dark', it switches to 'light', and vice versa.
+         * It also updates the toggle button's icon to reflect the new state (sun for dark mode, moon for light mode).
+         *
+         * @returns {void}
+         */
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+
+            const btn = document.getElementById('theme-toggle');
+            btn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        }
+
         // ---------------------------------------------------------
         // CONFIGURATION
         // ---------------------------------------------------------
+        /**
+         * The URL of the Supabase project.
+         * @type {string}
+         */
         const SUPABASE_URL = 'https://jjuhkycaddcmldiumibd.supabase.co';
+
+        /**
+         * The publishable API key for the Supabase project.
+         * @type {string}
+         */
         const SUPABASE_KEY = 'sb_publishable__cxAev6k5b27NC9eVNFTuA_ofw8jjcJ'; 
         // ---------------------------------------------------------
 
         const { createClient } = supabase;
+
+        /**
+         * The Supabase client instance used to interact with the database.
+         * initialized with the project URL and public key.
+         * @type {object}
+         */
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 1. Fetch Posts
+        /**
+         * Fetches the latest posts from the Supabase database and renders them in the feed.
+         *
+         * This function retrieves the 50 most recent posts, ordered by creation time in descending order.
+         * It clears the current feed content and populates it with the retrieved posts.
+         * Each post displays the content (sanitized to prevent XSS), a delete button, and a timestamp.
+         *
+         * @returns {Promise<void>} A promise that resolves when the posts have been fetched and rendered.
+         */
         async function fetchPosts() {
             const feedDiv = document.getElementById('feed');
             
@@ -160,7 +237,15 @@
             });
         }
 
-        // 2. Submit Post
+        /**
+         * Submits a new post to the Supabase database.
+         *
+         * This function reads the content from the input text area. If the content is not empty,
+         * it inserts a new row into the 'posts' table. Upon successful insertion, it clears the input field
+         * and refreshes the feed. It handles the button state (disabling it during submission) to prevent duplicate submissions.
+         *
+         * @returns {Promise<void>} A promise that resolves when the post has been submitted (or if the input was empty).
+         */
         async function submitPost() {
             const input = document.getElementById('postContent');
             const btn = document.getElementById('submitBtn');
@@ -186,7 +271,16 @@
             btn.textContent = "Post";
         }
 
-        // 3. Delete Post (Securely via RPC)
+        /**
+         * Deletes a specific post securely by calling a Supabase RPC function.
+         *
+         * This function prompts the user for an admin password. It then calls the 'delete_post_with_password'
+         * stored procedure on Supabase with the post ID and the provided password.
+         * If successful, it refreshes the feed. If it fails (e.g., incorrect password), it alerts the user.
+         *
+         * @param {number} id - The unique identifier of the post to delete.
+         * @returns {Promise<void>} A promise that resolves when the delete operation is complete.
+         */
         async function deletePost(id) {
             const password = prompt("Admin Password:");
             if (!password) return;
