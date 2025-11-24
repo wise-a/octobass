@@ -1,3 +1,6 @@
+***WORK IN PROGRESS.***
+ALL INFORMATION BELOW UNREVIEWED. SUBJECT TO CHANGE IN AGREEMENTS.
+
 # Octobass
 
 Octobass is a simple, single-page social feed application built with vanilla HTML/JS and Supabase. It allows users to post short messages and view a feed of recent posts. It includes basic moderation features (deletion with a password) and a dark mode.
