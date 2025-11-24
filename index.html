@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anonymous Board</title>
+    <title>octobass</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -23,7 +23,12 @@
             padding: 20px;
         }
 
-        h1 { text-align: center; margin-bottom: 20px; }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 20px;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
 
         /* Input Area */
         .post-box {
@@ -69,7 +74,7 @@
             border-radius: 8px;
             border: 1px solid #e5e7eb;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            position: relative; /* For positioning the delete button */
+            position: relative; 
         }
 
         .timestamp {
@@ -86,31 +91,33 @@
             right: 10px;
             background: none;
             border: none;
-            color: #ccc;
+            color: #e5e7eb; /* Hidden/Subtle until hover */
             font-size: 1.2rem;
             cursor: pointer;
             padding: 0 5px;
+            transition: color 0.2s;
         }
-        .delete-btn:hover { color: var(--danger-color); }
+        .card:hover .delete-btn { color: #ccc; } /* Show when hovering card */
+        .delete-btn:hover { color: var(--danger-color) !important; }
 
     </style>
 </head>
 <body>
 
-    <h1>The Wall</h1>
+    <h1>Octobass</h1>
 
     <div class="post-box">
-        <textarea id="postContent" placeholder="Write something anonymous..." maxlength="280"></textarea>
+        <textarea id="postContent" placeholder="Write something on Octobass..." maxlength="280"></textarea>
         <button id="submitBtn" class="btn-primary" onclick="submitPost()">Post</button>
     </div>
 
     <div id="feed" class="feed">
-        <p style="text-align:center; color:#888;">Loading posts...</p>
+        <p style="text-align:center; color:#888;">Loading Octobass feed...</p>
     </div>
 
     <script>
         // ---------------------------------------------------------
-        // YOUR CONFIGURATION
+        // CONFIGURATION
         // ---------------------------------------------------------
         const SUPABASE_URL = 'https://jjuhkycaddcmldiumibd.supabase.co';
         const SUPABASE_KEY = 'sb_publishable__cxAev6k5b27NC9eVNFTuA_ofw8jjcJ'; 
@@ -181,11 +188,9 @@
 
         // 3. Delete Post (Securely via RPC)
         async function deletePost(id) {
-            // Ask for password
             const password = prompt("Admin Password:");
             if (!password) return;
 
-            // Call the SQL function we created
             const { error } = await _supabase.rpc('delete_post_with_password', { 
                 post_id: id, 
                 secret_pass: password 
@@ -195,7 +200,6 @@
                 alert("Failed: Incorrect password or error.");
                 console.error(error);
             } else {
-                // Remove from UI immediately if successful
                 fetchPosts();
             }
         }
