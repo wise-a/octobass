@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous Board</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --accent-color: #3b82f6;
+            --danger-color: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 { text-align: center; margin-bottom: 20px; }
+
+        /* Input Area */
+        .post-box {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* Feed Area */
+        .feed { display: flex; flex-direction: column; gap: 15px; }
+
+        .card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            position: relative; /* For positioning the delete button */
+        }
+
+        .timestamp {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 8px;
+            display: block;
+        }
+
+        /* Delete Button Styling */
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #ccc;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        .delete-btn:hover { color: var(--danger-color); }
+
+    </style>
+</head>
+<body>
+
+    <h1>The Wall</h1>
+
+    <div class="post-box">
+        <textarea id="postContent" placeholder="Write something anonymous..." maxlength="280"></textarea>
+        <button id="submitBtn" class="btn-primary" onclick="submitPost()">Post</button>
+    </div>
+
+    <div id="feed" class="feed">
+        <p style="text-align:center; color:#888;">Loading posts...</p>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------
+        // YOUR CONFIGURATION
+        // ---------------------------------------------------------
+        const SUPABASE_URL = 'https://jjuhkycaddcmldiumibd.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable__cxAev6k5b27NC9eVNFTuA_ofw8jjcJ'; 
+        // ---------------------------------------------------------
+
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 1. Fetch Posts
+        async function fetchPosts() {
+            const feedDiv = document.getElementById('feed');
+            
+            const { data, error } = await _supabase
+                .from('posts')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (error) {
+                console.error(error);
+                feedDiv.innerHTML = '<p>Error loading posts.</p>';
+                return;
+            }
+
+            feedDiv.innerHTML = '';
+
+            data.forEach(post => {
+                // Security: Clean HTML to prevent hacking
+                const cleanContent = post.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                const date = new Date(post.created_at).toLocaleString();
+
+                const postHTML = `
+                    <div class="card">
+                        <button class="delete-btn" onclick="deletePost(${post.id})">&times;</button>
+                        <div>${cleanContent}</div>
+                        <span class="timestamp">${date}</span>
+                    </div>
+                `;
+                feedDiv.innerHTML += postHTML;
+            });
+        }
+
+        // 2. Submit Post
+        async function submitPost() {
+            const input = document.getElementById('postContent');
+            const btn = document.getElementById('submitBtn');
+            const content = input.value.trim();
+
+            if (!content) return;
+
+            btn.disabled = true;
+            btn.textContent = "Posting...";
+
+            const { error } = await _supabase
+                .from('posts')
+                .insert([{ content: content }]);
+
+            if (error) {
+                alert('Error: ' + error.message);
+            } else {
+                input.value = ''; 
+                fetchPosts(); 
+            }
+
+            btn.disabled = false;
+            btn.textContent = "Post";
+        }
+
+        // 3. Delete Post (Securely via RPC)
+        async function deletePost(id) {
+            // Ask for password
+            const password = prompt("Admin Password:");
+            if (!password) return;
+
+            // Call the SQL function we created
+            const { error } = await _supabase.rpc('delete_post_with_password', { 
+                post_id: id, 
+                secret_pass: password 
+            });
+
+            if (error) {
+                alert("Failed: Incorrect password or error.");
+                console.error(error);
+            } else {
+                // Remove from UI immediately if successful
+                fetchPosts();
+            }
+        }
+
+        // Initial Load
+        fetchPosts();
+        
+        // Realtime updates
+        _supabase.channel('public:posts')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
+            fetchPosts();
+        })
+        .subscribe();
+
+    </script>
+</body>
+</html>
